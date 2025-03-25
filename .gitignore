@@ -3,6 +3,7 @@ docs.json
 __dummy.html
 docs/
 /module_viz
+tools/
 module_viz.so
 module_viz.dylib
 module_viz.dll
@@ -16,3 +17,7 @@ module_viz-test-*
 *.lst
 *.png
 *.dot
+*.svg
+*.pdf
+*.png
+*.zip
