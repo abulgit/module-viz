@@ -42,15 +42,27 @@ example.config
 
 ## Requirements
 
-- D compiler (DMD, LDC, or GDC)
-- DUB package manager
-- GraphViz (required for image generation)
+- GraphViz (required only for image generation)
+- For building from source:
+  - D compiler (DMD, LDC, or GDC)
+  - DUB package manager
 
 ## Installation
 
+### Pre-built Executables
+
+The easiest way to use Module Viz is to download the pre-built executable:
+
+1. Go to the [Releases page](https://github.com/abulgit/module-viz/releases)
+2. Download the appropriate zip file for your platform (e.g., `module-viz-v1.0.0-win-x64.zip` for Windows)
+3. Extract the executable to a folder of your choice
+4. Run the executable from the command line: `viz --help`
+
+### Building from Source
+
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/module_viz.git
+git clone https://github.com/abulgit/module-viz.git
 cd module_viz
 
 # Build with DUB
@@ -63,10 +75,10 @@ Basic commands for running the tool:
 
 ```bash
 # Windows
-.\bin\module_viz.exe --input=path\to\project --output=graph.dot --image --text
+viz.exe --input=path\to\project --output=graph.dot --image --text
 
 # Linux/macOS
-./bin/module_viz --input=path/to/project --output=graph.dot --image --text
+./viz --input=path/to/project --output=graph.dot --image --text
 ```
 
 Available options:
@@ -83,14 +95,14 @@ Available options:
 ## Running on Windows
 
 ```powershell
-# Build the project
+# If building from source:
 dub build
 
 # Run the tool with text-based visualization
-.\bin\module_viz.exe --input=example --text
+viz.exe --input=example --text
 
 # Generate both DOT file and PNG image
-.\bin\module_viz.exe --input=example --output=example.dot --image
+viz.exe --input=example --output=example.dot --image
 
 # Open the generated PNG (if GraphViz is installed)
 example.png
@@ -99,14 +111,14 @@ example.png
 ## Running on Linux/macOS
 
 ```bash
-# Build the project
+# If building from source:
 dub build
 
 # Run the tool with text-based visualization
-./bin/module_viz --input=example --text
+./viz --input=example --text
 
 # Generate both DOT file and PNG image
-./bin/module_viz --input=example --output=example.dot --image
+./viz --input=example --output=example.dot --image
 
 # Open the generated PNG (if GraphViz is installed)
 # Linux
