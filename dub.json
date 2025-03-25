@@ -1,0 +1,27 @@
+{
+	"authors": [
+		"abul hossain khan"
+	],
+	"copyright": "Copyright © 2025, abulk",
+	"dependencies": {
+		"libdparse": "~>0.25.0"
+	},
+	"description": "A tool to analyze and visualize dependencies between modules in D projects",
+	"license": "proprietary",
+	"name": "module_viz",
+	"targetType": "executable",
+	"targetPath": "bin",
+	"targetName": "viz",
+	"mainSourceFile": "source/app.d",
+	"configurations": [
+		{
+			"name": "application",
+			"targetType": "executable"
+		},
+		{
+			"name": "library",
+			"targetType": "library",
+			"excludedSourceFiles": ["source/app.d"]
+		}
+	]
+}
