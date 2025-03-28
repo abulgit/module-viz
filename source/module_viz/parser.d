@@ -22,7 +22,10 @@ class DependencyParser {
 private:
     // Determine module name from file path when no explicit module declaration exists
     string getModuleName(string filePath) {
-        import std.path : baseName, stripExtension;
+        import std.path : baseName, stripExtension, buildNormalizedPath;
+
+        // Normalize path separators to be consistent
+        filePath = buildNormalizedPath(filePath);
 
         string fileName = baseName(filePath).stripExtension();
         string dir = std.path.dirName(filePath);
@@ -32,15 +35,27 @@ private:
             string packageDir = baseName(dir);
             dir = std.path.dirName(dir);
 
-            if (dir != ".") {
-                return join([baseName(dir), packageDir], ".");
+            // Handle nested packages
+            string packageName = packageDir;
+
+            // Build package name from directory structure
+            while (dir != "." && dir != "/" && baseName(dir) != "source" && baseName(dir) != "src") {
+                packageName = baseName(dir) ~ "." ~ packageName;
+                dir = std.path.dirName(dir);
             }
-            return packageDir;
+
+            return packageName;
         }
 
         // For regular modules, use directory structure to infer module name
-        if (dir != "." && baseName(dir) != "source") {
-            return join([baseName(dir), fileName], ".");
+        if (dir != "." && dir != "/" && baseName(dir) != "source" && baseName(dir) != "src") {
+            // Build full module name from directory structure
+            string modulePath = fileName;
+            while (dir != "." && dir != "/" && baseName(dir) != "source" && baseName(dir) != "src") {
+                modulePath = baseName(dir) ~ "." ~ modulePath;
+                dir = std.path.dirName(dir);
+            }
+            return modulePath;
         }
 
         return fileName;
@@ -100,18 +115,67 @@ private:
         return imports;
     }
 
-    // Simple lexer to remove comments from D source code
+    // Improved lexer to remove comments from D source code
     string stripComments(string code) {
         bool inLineComment = false;
         bool inBlockComment = false;
+        bool inNestedComment = false;
+        int nestedCommentDepth = 0;
         bool inString = false;
+        bool inWysiwygString = false;
+        bool inDelimitedString = false;
         bool inCharLiteral = false;
         char[] result;
 
         for (size_t i = 0; i < code.length; i++) {
-            if (!inString && !inCharLiteral) {
+            // Handle string literals first to avoid misdetecting comments in strings
+            if (!inLineComment && !inBlockComment && !inNestedComment) {
+                // Check for wysiwyg strings (r"...")
+                if (!inString && !inWysiwygString && !inDelimitedString && !inCharLiteral &&
+                    i + 1 < code.length && code[i] == 'r' && code[i + 1] == '"') {
+                    inWysiwygString = true;
+                    result ~= code[i];
+                    continue;
+                }
+                // Check for delimited strings (q"(...)") or similar
+                else if (!inString && !inWysiwygString && !inDelimitedString && !inCharLiteral &&
+                         i + 1 < code.length && code[i] == 'q' && code[i + 1] == '"') {
+                    inDelimitedString = true;
+                    result ~= code[i];
+                    continue;
+                }
+                // Regular string handling
+                else if (!inWysiwygString && !inDelimitedString && !inCharLiteral &&
+                         code[i] == '"' && (i == 0 || code[i - 1] != '\\')) {
+                    inString = !inString;
+                    result ~= code[i];
+                    continue;
+                }
+                // Character literal
+                else if (!inString && !inWysiwygString && !inDelimitedString &&
+                         code[i] == '\'' && (i == 0 || code[i - 1] != '\\')) {
+                    inCharLiteral = !inCharLiteral;
+                    result ~= code[i];
+                    continue;
+                }
+                // End of wysiwyg string
+                else if (inWysiwygString && code[i] == '"') {
+                    inWysiwygString = false;
+                    result ~= code[i];
+                    continue;
+                }
+                // End of delimited string
+                else if (inDelimitedString && i + 1 < code.length && code[i] == '"' && code[i + 1] == ')') {
+                    inDelimitedString = false;
+                    result ~= code[i];
+                    continue;
+                }
+            }
+
+            // Now handle comments
+            if (!inString && !inWysiwygString && !inDelimitedString && !inCharLiteral) {
                 // Check for start of comments
-                if (!inLineComment && !inBlockComment && i + 1 < code.length) {
+                if (!inLineComment && !inBlockComment && !inNestedComment && i + 1 < code.length) {
                     if (code[i] == '/' && code[i + 1] == '/') {
                         inLineComment = true;
                         i++;
@@ -122,11 +186,35 @@ private:
                         i++;
                         continue;
                     }
+                    else if (code[i] == '/' && code[i + 1] == '+') {
+                        inNestedComment = true;
+                        nestedCommentDepth = 1;
+                        i++;
+                        continue;
+                    }
                 }
-                // Check for end of comments
+                // Check for nested comment start while already in a nested comment
+                else if (inNestedComment && i + 1 < code.length && code[i] == '/' && code[i + 1] == '+') {
+                    nestedCommentDepth++;
+                    i++;
+                    continue;
+                }
+                // Check for nested comment end
+                else if (inNestedComment && i + 1 < code.length && code[i] == '+' && code[i + 1] == '/') {
+                    nestedCommentDepth--;
+                    if (nestedCommentDepth == 0) {
+                        inNestedComment = false;
+                    }
+                    i++;
+                    continue;
+                }
+                // Check for end of line comments
                 else if (inLineComment && (code[i] == '\n' || code[i] == '\r')) {
                     inLineComment = false;
+                    result ~= code[i]; // Keep the newline
+                    continue;
                 }
+                // Check for end of block comments
                 else if (inBlockComment && i + 1 < code.length && code[i] == '*' && code[i + 1] == '/') {
                     inBlockComment = false;
                     i++;
@@ -134,18 +222,9 @@ private:
                 }
             }
 
-            // Track string and character literals to prevent false comment detection
-            if (!inLineComment && !inBlockComment) {
-                if (code[i] == '\"' && (i == 0 || code[i - 1] != '\\')) {
-                    inString = !inString;
-                }
-                else if (code[i] == '\'' && (i == 0 || code[i - 1] != '\\')) {
-                    inCharLiteral = !inCharLiteral;
-                }
-
-                if (!inLineComment && !inBlockComment) {
-                    result ~= code[i];
-                }
+            // Add character to result if not in a comment
+            if (!inLineComment && !inBlockComment && !inNestedComment) {
+                result ~= code[i];
             }
         }
 
@@ -193,6 +272,31 @@ public:
             }
         }
 
-        return allDependencies;
+        // Validate all dependencies to ensure they have valid module names
+        ModuleDependency[] validDependencies;
+        foreach (dep; allDependencies) {
+            if (isValidModuleName(dep.sourceModule) && isValidModuleName(dep.importedModule)) {
+                validDependencies ~= dep;
+            } else {
+                stderr.writefln("Warning: Skipping invalid module dependency: %s -> %s",
+                    dep.sourceModule, dep.importedModule);
+            }
+        }
+
+        return validDependencies;
+    }
+
+    // Validate that a module name follows D language conventions
+    private bool isValidModuleName(string moduleName) {
+        if (moduleName.length == 0) {
+            return false;
+        }
+
+        // Simple regex to check if the module name follows D conventions
+        // Module names should be composed of identifiers separated by dots
+        auto moduleRegex = regex(r"^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*$");
+        auto match = matchFirst(moduleName, moduleRegex);
+
+        return !match.empty;
     }
 }

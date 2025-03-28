@@ -110,16 +110,38 @@ public:
         writeln("Module Dependency Graph:");
         writeln("=======================");
 
+        // First, print modules that import other modules
         foreach (moduleName; moduleNames.sort!((a, b) => a < b)) {
-            writefln("%s", moduleName);
+            if (moduleName in adjacencyList && adjacencyList[moduleName].length > 0) {
+                writefln("%s", moduleName);
 
-            if (moduleName in adjacencyList) {
                 foreach (imported; adjacencyList[moduleName].sort!((a, b) => a < b)) {
                     writefln("  └─ %s", imported);
                 }
-            }
 
-            writeln();
+                writeln();
+            }
+        }
+
+        // Then print modules that are only imported but don't import anything
+        bool[string] printedModules;
+        foreach (moduleName; moduleNames) {
+            if (moduleName in adjacencyList) {
+                printedModules[moduleName] = true;
+            }
+        }
+
+        bool foundOrphans = false;
+        foreach (moduleName; moduleNames.sort!((a, b) => a < b)) {
+            if (moduleName !in printedModules) {
+                if (!foundOrphans) {
+                    writeln("Modules with no imports:");
+                    writeln("=======================");
+                    foundOrphans = true;
+                }
+                writefln("%s (imported only)", moduleName);
+                writeln();
+            }
         }
     }
 }

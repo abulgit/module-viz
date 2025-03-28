@@ -8,6 +8,7 @@ import std.string;
 import std.array;
 import std.process;
 import std.conv;
+import std.algorithm : canFind;
 
 import module_viz.parser;
 import module_viz.graph;
@@ -107,9 +108,17 @@ void tryGenerateImage(string dotFile, string format)
 			stderr.writeln("- https://sketchviz.com/");
 			stderr.writeln("\n----- Text-based visualization -----");
 			stderr.writeln("You can also use the --text option to see a text-based visualization:");
-			stderr.writefln("   .\\bin\\module_viz.exe --input=%s --text",
+			stderr.writefln("   .\\bin\\viz.exe --input=%s --text",
 				(dirName(dotFile) == ".") ? "." : dirName(dotFile));
 			return;
+		}
+
+		// Validate the image format is supported by GraphViz
+		string[] supportedFormats = ["png", "svg", "pdf", "jpg", "jpeg", "bmp", "gif", "tiff", "ps"];
+		if (!supportedFormats.canFind(format.toLower)) {
+			stderr.writefln("\nWarning: The format '%s' might not be supported by GraphViz.", format);
+			stderr.writeln("Common supported formats are: png, svg, pdf, jpg, jpeg, bmp, gif");
+			stderr.writeln("Attempting to generate the image anyway...");
 		}
 
 		// Generate the image using the dot command
@@ -132,6 +141,13 @@ void tryGenerateImage(string dotFile, string format)
 		else
 		{
 			stderr.writefln("Error generating image: %s", dotCmd.output);
+
+			if (dotCmd.output.toLower.canFind("format")) {
+				stderr.writefln("\nIt seems the format '%s' is not supported by your GraphViz installation.", format);
+				stderr.writeln("Try one of these common formats instead: png, svg, pdf, jpg");
+				stderr.writefln("Example: .\\bin\\viz.exe --input=%s --image --format=png",
+					(dirName(dotFile) == ".") ? "." : dirName(dotFile));
+			}
 		}
 	}
 	catch (Exception e)
